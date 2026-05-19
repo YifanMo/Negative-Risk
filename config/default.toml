@@ -1,0 +1,28 @@
+[server]
+host = "127.0.0.1"
+port = 8010
+
+[gamma]
+base_url = "https://gamma-api.polymarket.com"
+page_size = 500
+
+[clob]
+ws_url = "wss://ws-subscriptions-clob.polymarket.com/ws/market"
+
+[execution]
+enabled = false
+
+[engine]
+event_refresh_secs = 300
+scan_interval_ms = 250
+min_event_liquidity = 0.0
+max_markets_per_event = 60
+max_events = 500
+ws_chunk_size = 400
+ws_reconnect_secs = 3
+
+[arb]
+min_gross_profit = 0.01
+min_total_usd = 2.0
+cooldown_secs = 120
+max_depth_pct = 0.5

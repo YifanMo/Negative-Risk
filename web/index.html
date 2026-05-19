@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Negative-Risk Monitor</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>Negative-Risk Monitor</h1>
+          <p>Polymarket paper-arb dashboard. Trading is disabled.</p>
+        </div>
+        <div class="connection" id="connectionState">Connecting</div>
+      </header>
+
+      <section class="stats-grid" id="statsGrid">
+        <div class="stat">
+          <span>Events</span>
+          <strong id="eventCount">0</strong>
+        </div>
+        <div class="stat">
+          <span>Tokens</span>
+          <strong id="tokenCount">0</strong>
+        </div>
+        <div class="stat">
+          <span>WS Shards</span>
+          <strong id="shardCount">0/0</strong>
+        </div>
+        <div class="stat">
+          <span>Opportunities</span>
+          <strong id="oppCount">0</strong>
+        </div>
+      </section>
+
+      <section class="status-strip">
+        <div>
+          <span>Last refresh</span>
+          <strong id="lastRefresh">-</strong>
+        </div>
+        <div>
+          <span>Last scan</span>
+          <strong id="lastScan">-</strong>
+        </div>
+        <div>
+          <span>Last error</span>
+          <strong id="lastError">-</strong>
+        </div>
+      </section>
+
+      <section class="content-grid">
+        <div class="panel table-panel">
+          <div class="panel-head">
+            <h2>Opportunities</h2>
+            <span id="thresholdText"></span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Event</th>
+                  <th>Markets</th>
+                  <th>Sum YES Ask</th>
+                  <th>Best NO</th>
+                  <th>Gross</th>
+                  <th>Qty</th>
+                  <th>Total USD</th>
+                  <th>Book Age</th>
+                </tr>
+              </thead>
+              <tbody id="opportunityRows">
+                <tr>
+                  <td colspan="8" class="empty">Waiting for live order books...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <aside class="panel detail-panel">
+          <div class="panel-head">
+            <h2>Event Detail</h2>
+          </div>
+          <div id="detailBody" class="detail-body">
+            <p class="empty">Select an opportunity to inspect the paper execution path.</p>
+          </div>
+        </aside>
+      </section>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
