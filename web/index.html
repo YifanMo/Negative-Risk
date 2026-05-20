@@ -13,7 +13,13 @@
           <h1>Negative-Risk Monitor</h1>
           <p>Polymarket paper-arb dashboard. Trading is disabled.</p>
         </div>
-        <div class="connection" id="connectionState">Connecting</div>
+        <div class="topbar-actions">
+          <nav class="page-nav" aria-label="Dashboard sections">
+            <a class="active" href="/monitor">Monitor</a>
+            <a href="/history">History</a>
+          </nav>
+          <div class="connection" id="connectionState">Connecting</div>
+        </div>
       </header>
 
       <section class="stats-grid" id="statsGrid">
@@ -53,22 +59,19 @@
       <section class="content-grid">
         <div class="panel table-panel">
           <div class="panel-head">
-            <h2>Opportunities</h2>
-            <span id="thresholdText"></span>
+            <div>
+              <h2 id="tableTitle">Opportunities</h2>
+              <span id="thresholdText"></span>
+            </div>
+            <div class="view-toggle" role="tablist" aria-label="Monitor table view">
+              <button id="opportunitiesViewBtn" class="active" type="button">Opportunities</button>
+              <button id="eventsViewBtn" type="button">All Events</button>
+            </div>
           </div>
           <div class="table-wrap">
             <table>
-              <thead>
-                <tr>
-                  <th>Event</th>
-                  <th>Markets</th>
-                  <th>Sum YES Ask</th>
-                  <th>Best NO</th>
-                  <th>Gross</th>
-                  <th>Qty</th>
-                  <th>Total USD</th>
-                  <th>Book Age</th>
-                </tr>
+              <thead id="monitorTableHead">
+                <tr><th>Event</th><th>Markets</th><th>Sum YES Ask</th><th>Best NO</th><th>Gross</th><th>Qty</th><th>Total USD</th><th>Book Age</th></tr>
               </thead>
               <tbody id="opportunityRows">
                 <tr>

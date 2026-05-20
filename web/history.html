@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Negative-Risk History Replay</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>Negative-Risk History</h1>
+          <p>Local orderbook snapshot replay. Trading is simulated only.</p>
+        </div>
+        <div class="topbar-actions">
+          <nav class="page-nav" aria-label="Dashboard sections">
+            <a href="/monitor">Monitor</a>
+            <a class="active" href="/history">History</a>
+          </nav>
+          <div class="connection connected" id="historyState">Idle</div>
+        </div>
+      </header>
+
+      <section class="control-panel panel">
+        <form id="historyForm" class="controls">
+          <label>
+            <span>Lookback hours</span>
+            <input id="hoursInput" type="number" min="1" max="168" step="1" value="24" />
+          </label>
+          <label>
+            <span>Fidelity minutes</span>
+            <input id="fidelityInput" type="number" min="1" max="60" step="1" value="5" />
+          </label>
+          <label>
+            <span>Investment USD</span>
+            <input id="investmentInput" type="number" min="1" step="100" value="1000" />
+          </label>
+          <label>
+            <span>Slippage %</span>
+            <input id="slippageInput" type="number" min="0" max="20" step="0.1" value="0.5" />
+          </label>
+          <label>
+            <span>Data source</span>
+            <select id="sourceInput">
+              <option value="book-snapshot" selected>Local book snapshots</option>
+              <option value="pmxt-archive">PMXT archive order book</option>
+              <option value="price-proxy">Price proxy</option>
+            </select>
+          </label>
+          <button type="submit">Run Replay</button>
+        </form>
+        <p class="note" id="coverageNote">Strict mode uses locally recorded bid/ask/depth snapshots. PMXT archive mode reads local hourly Parquet files only.</p>
+      </section>
+
+      <section class="stats-grid history-stats">
+        <div class="stat">
+          <span>Opportunities</span>
+          <strong id="oppCount">0</strong>
+        </div>
+        <div class="stat">
+          <span>Sim Trades</span>
+          <strong id="tradeCount">0</strong>
+        </div>
+        <div class="stat">
+          <span>Total PnL</span>
+          <strong id="totalPnl">$0.00</strong>
+        </div>
+        <div class="stat">
+          <span>Ending Equity</span>
+          <strong id="endingEquity">$0.00</strong>
+        </div>
+      </section>
+
+      <section class="status-strip history-status">
+        <div>
+          <span>Source</span>
+          <strong id="sourceLabel">-</strong>
+        </div>
+        <div>
+          <span>Coverage</span>
+          <strong id="coverageWindow">-</strong>
+        </div>
+        <div>
+          <span>Events / Data points</span>
+          <strong id="coverageEvents">-</strong>
+        </div>
+        <div>
+          <span>Generated at</span>
+          <strong id="generatedAt">-</strong>
+        </div>
+      </section>
+
+      <section class="history-grid history-grid-single">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Equity Curve</h2>
+            <span id="curveMeta"></span>
+          </div>
+          <div id="equityChart" class="equity-chart">
+            <p class="empty">Run a replay to draw the simulated capital curve.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel history-table-panel">
+        <div class="panel-head">
+          <h2>Trade Details</h2>
+          <span>one best simulated trade per historical bucket</span>
+        </div>
+        <div class="table-wrap">
+          <table class="trade-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Event</th>
+                <th>Buy NO</th>
+                <th>Qty</th>
+                <th>Used / Unused</th>
+                <th>Sell YES Bid Sum</th>
+                <th>Gross / Share</th>
+                <th>Net PnL</th>
+                <th>Return</th>
+                <th>Equity After</th>
+              </tr>
+            </thead>
+            <tbody id="tradeRows">
+              <tr><td colspan="10" class="empty">Run a replay to inspect simulated trade details.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel history-table-panel">
+        <div class="panel-head">
+          <h2>Top Events</h2>
+          <span>ranked by max simulated PnL</span>
+        </div>
+        <div class="table-wrap">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Event</th>
+                <th>Count</th>
+                <th>Max Gross</th>
+                <th>Max Trade PnL</th>
+                <th>Total PnL</th>
+                <th>Latest</th>
+              </tr>
+            </thead>
+            <tbody id="topEventRows">
+              <tr><td colspan="6" class="empty">Run a replay to inspect historical opportunities.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+    <script src="/static/history.js"></script>
+  </body>
+</html>

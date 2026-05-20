@@ -24,11 +24,27 @@ class GammaConfig:
 @dataclass(frozen=True)
 class ClobConfig:
     ws_url: str = "wss://ws-subscriptions-clob.polymarket.com/ws/market"
+    rest_url: str = "https://clob.polymarket.com"
 
 
 @dataclass(frozen=True)
 class ExecutionConfig:
     enabled: bool = False
+
+
+@dataclass(frozen=True)
+class HistoryConfig:
+    lookback_hours: int = 24
+    fidelity_minutes: int = 5
+    batch_size: int = 20
+    max_events: int = 100
+    cache_ttl_secs: int = 300
+    book_db_path: str = "data/negrisk_book_history.sqlite"
+    snapshot_interval_secs: int = 5
+    retention_hours: int = 72
+    max_snapshot_events: int = 100
+    max_book_age_secs: int = 30
+    pmxt_cache_dir: str = "data/pmxt_cache"
 
 
 @dataclass(frozen=True)
@@ -56,6 +72,7 @@ class AppConfig:
     gamma: GammaConfig = GammaConfig()
     clob: ClobConfig = ClobConfig()
     execution: ExecutionConfig = ExecutionConfig()
+    history: HistoryConfig = HistoryConfig()
     engine: EngineConfig = EngineConfig()
     arb: ArbConfig = ArbConfig()
 
@@ -75,6 +92,7 @@ class AppConfig:
             gamma=GammaConfig(**raw.get("gamma", {})),
             clob=ClobConfig(**raw.get("clob", {})),
             execution=ExecutionConfig(**raw.get("execution", {})),
+            history=_history_config(raw.get("history", {})),
             engine=_engine_config(raw.get("engine", {})),
             arb=_arb_config(raw.get("arb", {})),
         )
@@ -95,6 +113,23 @@ def _engine_config(raw: dict) -> EngineConfig:
         max_events=int(raw.get("max_events", 500)),
         ws_chunk_size=int(raw.get("ws_chunk_size", 400)),
         ws_reconnect_secs=int(raw.get("ws_reconnect_secs", 3)),
+    )
+
+
+def _history_config(raw: dict) -> HistoryConfig:
+    max_events = int(raw.get("max_events", 100))
+    return HistoryConfig(
+        lookback_hours=int(raw.get("lookback_hours", 24)),
+        fidelity_minutes=int(raw.get("fidelity_minutes", 5)),
+        batch_size=int(raw.get("batch_size", 20)),
+        max_events=max_events,
+        cache_ttl_secs=int(raw.get("cache_ttl_secs", 300)),
+        book_db_path=str(raw.get("book_db_path", "data/negrisk_book_history.sqlite")),
+        snapshot_interval_secs=int(raw.get("snapshot_interval_secs", 5)),
+        retention_hours=int(raw.get("retention_hours", 72)),
+        max_snapshot_events=int(raw.get("max_snapshot_events", max_events)),
+        max_book_age_secs=int(raw.get("max_book_age_secs", 30)),
+        pmxt_cache_dir=str(raw.get("pmxt_cache_dir", "data/pmxt_cache")),
     )
 
 

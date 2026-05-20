@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from negrisk.models import NegRiskEvent, NegRiskMarket
 from negrisk.orderbook import LocalBook
-from negrisk.signal import check_event
+from negrisk.signal import check_event, simulate_market_profits_1_share
 
 
 def make_book(bid, ask, bid_size="100", ask_size="100", tick=None):
@@ -49,6 +49,31 @@ def test_signal_selects_best_no_leg():
     assert opp.best_no_idx == 0
     assert opp.gross_profit == Decimal("0.17")
     assert opp.sum_yes_ask == Decimal("1.19")
+
+
+def test_one_share_market_simulation_lists_each_no_leg():
+    books = {
+        "yes1": make_book("0.50", "0.52"),
+        "no1": make_book("0.46", "0.48"),
+        "yes2": make_book("0.35", "0.36"),
+        "no2": make_book("0.62", "0.65"),
+        "yes3": make_book("0.30", "0.31"),
+        "no3": make_book("0.68", "0.70"),
+    }
+
+    rows = simulate_market_profits_1_share(
+        make_event(),
+        books,
+        max_depth_pct=Decimal("0.5"),
+    )
+
+    assert len(rows) == 3
+    assert rows[0]["question"] == "A"
+    assert rows[0]["buy_no_ask"] == 0.48
+    assert rows[0]["sum_other_yes_bid"] == 0.65
+    assert rows[0]["profit_1_share"] == 0.17
+    assert rows[0]["executable_1_share"] is True
+    assert rows[1]["profit_1_share"] == 0.15
 
 
 def test_signal_filters_below_sum_yes_threshold():

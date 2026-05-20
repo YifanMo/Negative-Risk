@@ -11,11 +11,12 @@ from typing import Any
 import httpx
 import websockets
 
+from .book_history import BookHistoryStore
 from .config import AppConfig
 from .gamma import fetch_negrisk_events
 from .models import NegRiskEvent
 from .orderbook import LocalBook, levels_from_payload, parse_decimal
-from .signal import check_event
+from .signal import check_event, simulate_market_profits_1_share
 
 
 LOG = logging.getLogger(__name__)
@@ -59,9 +60,14 @@ class NegativeRiskEngine:
         self.state = EngineState()
         self.events: dict[str, NegRiskEvent] = {}
         self.books: dict[str, LocalBook] = {}
+        self.book_history = BookHistoryStore(
+            config.history.book_db_path,
+            retention_hours=config.history.retention_hours,
+        )
         self.token_to_events: dict[str, set[str]] = {}
         self.opportunities: dict[str, dict[str, Any]] = {}
         self.shards: dict[int, ShardStatus] = {}
+        self._last_book_snapshot_at: float = 0.0
         self._task: asyncio.Task | None = None
         self._refresh_task: asyncio.Task | None = None
         self._scan_task: asyncio.Task | None = None
@@ -72,6 +78,7 @@ class NegativeRiskEngine:
     async def start(self) -> None:
         if self._task and not self._task.done():
             return
+        self.book_history.initialize()
         self.state.running = True
         self._task = asyncio.create_task(self._run(), name="negrisk-engine")
 
@@ -136,11 +143,58 @@ class NegativeRiskEngine:
             reverse=True,
         )
 
+    def get_events_summary(self) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for event in self.events.values():
+            simulations = simulate_market_profits_1_share(
+                event,
+                self.books,
+                max_depth_pct=self.config.arb.max_depth_pct,
+            )
+            best = max(
+                simulations,
+                key=lambda row: row["profit_1_share"] if row["profit_1_share"] is not None else float("-inf"),
+                default=None,
+            )
+            complete_count = sum(1 for row in simulations if row["status"] == "ok")
+            opportunity = self.opportunities.get(event.event_id)
+            rows.append(
+                {
+                    "event_id": event.event_id,
+                    "event_title": event.title,
+                    "n_markets": len(event.markets),
+                    "liquidity": float(event.liquidity) if event.liquidity is not None else None,
+                    "complete_market_count": complete_count,
+                    "has_opportunity": opportunity is not None,
+                    "best_market_question": best["question"] if best else None,
+                    "best_profit_1_share": best["profit_1_share"] if best else None,
+                    "best_return_pct": best["return_pct"] if best else None,
+                    "best_max_qty": best["max_qty"] if best else None,
+                    "opportunity": opportunity,
+                }
+            )
+
+        return sorted(
+            rows,
+            key=lambda row: (
+                row["has_opportunity"],
+                row["best_profit_1_share"] if row["best_profit_1_share"] is not None else float("-inf"),
+                row["complete_market_count"],
+            ),
+            reverse=True,
+        )
+
     def get_event_detail(self, event_id: str) -> dict[str, Any] | None:
         event = self.events.get(event_id)
         if event is None:
             return None
         markets: list[dict[str, Any]] = []
+        simulations = simulate_market_profits_1_share(
+            event,
+            self.books,
+            max_depth_pct=self.config.arb.max_depth_pct,
+        )
+        simulations_by_index = {row["index"]: row for row in simulations}
         for idx, market in enumerate(event.markets):
             yes_book = self.books.get(market.yes_token_id, LocalBook())
             no_book = self.books.get(market.no_token_id, LocalBook())
@@ -155,6 +209,7 @@ class NegativeRiskEngine:
                     "min_tick_size": float(market.min_tick_size) if market.min_tick_size else None,
                     "yes_book": yes_book.to_dict(),
                     "no_book": no_book.to_dict(),
+                    "one_share_simulation": simulations_by_index.get(idx),
                 }
             )
         return {
@@ -163,6 +218,7 @@ class NegativeRiskEngine:
             "neg_risk_market_id": event.neg_risk_market_id,
             "liquidity": float(event.liquidity) if event.liquidity is not None else None,
             "markets": markets,
+            "market_simulations": simulations,
             "opportunity": self.opportunities.get(event_id),
         }
 
@@ -372,7 +428,25 @@ class NegativeRiskEngine:
                 changed = True
             self.opportunities = next_opportunities
             self.state.last_scan_at = datetime.now(timezone.utc)
+            self._record_book_snapshots_if_due(self.state.last_scan_at)
         return changed
+
+    def _record_book_snapshots_if_due(self, now: datetime) -> None:
+        interval = max(1, self.config.history.snapshot_interval_secs)
+        if now.timestamp() - self._last_book_snapshot_at < interval:
+            return
+        self._last_book_snapshot_at = now.timestamp()
+        try:
+            self.book_history.record_snapshots(
+                self.events.values(),
+                self.books,
+                now=now,
+                max_events=self.config.history.max_snapshot_events,
+                max_book_age_secs=self.config.history.max_book_age_secs,
+            )
+        except Exception as exc:
+            self.state.last_error = f"book snapshot failed: {exc}"
+            LOG.exception("book snapshot failed")
 
     async def _publish(self) -> None:
         if not self._subscribers:

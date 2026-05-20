@@ -2,10 +2,89 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Mapping
+from typing import Any, Mapping
 
 from .models import ConversionOpportunity, NegRiskEvent
 from .orderbook import LocalBook
+
+
+def simulate_market_profits_1_share(
+    event: NegRiskEvent,
+    books: Mapping[str, LocalBook],
+    *,
+    max_depth_pct: Decimal,
+) -> list[dict[str, Any]]:
+    yes_bids: list[Decimal | None] = []
+    no_asks: list[Decimal | None] = []
+    no_ask_depth: list[Decimal | None] = []
+    yes_bid_depth: list[Decimal | None] = []
+
+    for market in event.markets:
+        yes_book = books.get(market.yes_token_id)
+        no_book = books.get(market.no_token_id)
+        yes_bid = yes_book.best_bid() if yes_book is not None else None
+        no_ask = no_book.best_ask() if no_book is not None else None
+        tick = market.min_tick_size or (yes_book.tick_size if yes_book is not None else None)
+
+        yes_bids.append(yes_bid)
+        no_asks.append(no_ask)
+        no_ask_depth.append(
+            no_book.ask_depth_up_to(Decimal("1")) * max_depth_pct if no_book is not None and no_ask is not None else None
+        )
+        if yes_book is not None and yes_bid is not None and tick is not None:
+            sell_limit = max(yes_bid - tick, Decimal("0.01"))
+            yes_bid_depth.append(yes_book.bid_depth_at_or_above(sell_limit) * max_depth_pct)
+        else:
+            yes_bid_depth.append(None)
+
+    sum_yes_bid = sum((bid for bid in yes_bids if bid is not None), Decimal("0")) if all(
+        bid is not None for bid in yes_bids
+    ) else None
+
+    rows: list[dict[str, Any]] = []
+    for idx, market in enumerate(event.markets):
+        reason = None
+        sum_other_yes_bid = None
+        profit_1_share = None
+        return_pct = None
+        max_qty = None
+        executable_1_share = False
+
+        if sum_yes_bid is None:
+            reason = "missing YES bid"
+        elif no_asks[idx] is None:
+            reason = "missing NO ask"
+        elif yes_bids[idx] is None:
+            reason = "missing market YES bid"
+        else:
+            sum_other_yes_bid = sum_yes_bid - yes_bids[idx]
+            profit_1_share = sum_other_yes_bid - no_asks[idx]
+            if no_asks[idx] > 0:
+                return_pct = (profit_1_share / no_asks[idx]) * Decimal("100")
+
+            sell_caps = [depth for depth_idx, depth in enumerate(yes_bid_depth) if depth_idx != idx and depth is not None]
+            if len(event.markets) > 1 and no_ask_depth[idx] is not None and len(sell_caps) == len(event.markets) - 1:
+                max_qty = min(no_ask_depth[idx], min(sell_caps), Decimal("10000"))
+                executable_1_share = max_qty >= Decimal("1")
+            else:
+                reason = "missing depth or tick"
+
+        rows.append(
+            {
+                "index": idx,
+                "question": market.question,
+                "buy_no_ask": _num(no_asks[idx]),
+                "sum_other_yes_bid": _num(sum_other_yes_bid),
+                "profit_1_share": _num(profit_1_share),
+                "return_pct": _num(return_pct),
+                "max_qty": _num(max_qty),
+                "executable_1_share": executable_1_share,
+                "status": "ok" if reason is None else "incomplete",
+                "reason": reason,
+            }
+        )
+
+    return rows
 
 
 def check_event(
@@ -100,3 +179,7 @@ def check_event(
         no_asks=tuple(no_asks),
         oldest_book_update=oldest,
     )
+
+
+def _num(value: Decimal | None) -> float | None:
+    return None if value is None else float(value)

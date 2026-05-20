@@ -8,9 +8,23 @@ page_size = 500
 
 [clob]
 ws_url = "wss://ws-subscriptions-clob.polymarket.com/ws/market"
+rest_url = "https://clob.polymarket.com"
 
 [execution]
 enabled = false
+
+[history]
+lookback_hours = 24
+fidelity_minutes = 5
+batch_size = 20
+max_events = 100
+cache_ttl_secs = 300
+book_db_path = "data/negrisk_book_history.sqlite"
+snapshot_interval_secs = 5
+retention_hours = 72
+max_snapshot_events = 100
+max_book_age_secs = 30
+pmxt_cache_dir = "data/pmxt_cache"
 
 [engine]
 event_refresh_secs = 300

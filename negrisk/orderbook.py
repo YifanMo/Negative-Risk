@@ -73,12 +73,14 @@ class LocalBook:
     def total_ask_depth(self) -> Decimal:
         return sum(self.asks.values(), Decimal("0"))
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self, *, level_limit: int = 5) -> dict[str, Any]:
         return {
             "best_bid": _float(self.best_bid()),
             "best_ask": _float(self.best_ask()),
             "bid_depth": _float(self.total_bid_depth()),
             "ask_depth": _float(self.total_ask_depth()),
+            "bid_levels": _levels(self.bids.items(), reverse=True, limit=level_limit),
+            "ask_levels": _levels(self.asks.items(), reverse=False, limit=level_limit),
             "tick_size": _float(self.tick_size),
             "updated_at": self.updated_at.isoformat(),
         }
@@ -97,3 +99,20 @@ def levels_from_payload(levels: Iterable[Mapping[str, Any]]) -> list[tuple[Decim
 
 def _float(value: Decimal | None) -> float | None:
     return None if value is None else float(value)
+
+
+def _levels(
+    levels: Iterable[tuple[Decimal, Decimal]],
+    *,
+    reverse: bool,
+    limit: int,
+) -> list[dict[str, float]]:
+    rows = sorted(levels, key=lambda row: row[0], reverse=reverse)[: max(0, limit)]
+    return [
+        {
+            "price": float(price),
+            "size": float(size),
+            "notional": float(price * size),
+        }
+        for price, size in rows
+    ]
